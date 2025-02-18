@@ -1,87 +1,83 @@
-const express = require('express');
-const cors = require('cors');
-const { MongoClient, ServerApiVersion, ObjectId } = require('mongodb');
-require('dotenv').config();
+const express = require("express");
+const cors = require("cors");
+const { MongoClient, ServerApiVersion, ObjectId } = require("mongodb");
+require("dotenv").config();
+
 const app = express();
-const port = process.env.PORT || 5000;
+const port = process.env.PORT || 7000;
 
-
-///middle wares
+///middlewares
 app.use(cors());
 app.use(express.json());
 
-
-
 const uri = `mongodb+srv://${process.env.DB_USER}:${process.env.DB_PASSWORD}@cluster0.izqajim.mongodb.net/?retryWrites=true&w=majority`;
-console.log(uri);
-const client = new MongoClient(uri, { useNewUrlParser: true, useUnifiedTopology: true, serverApi: ServerApiVersion.v1 });
+const client = new MongoClient(uri, {
+  useNewUrlParser: true,
+  useUnifiedTopology: true,
+  serverApi: ServerApiVersion.v1,
+});
 
-async function run(){
-          try{
-          
-            const taskCollection = client.db('taskManger').collection('tasks');
-              
+async function run() {
+  try {
+    const db = client.db("taskManager");
 
-          
-            // app.get('/tasks',  async(req, res) => {
-            //   const email = req.query.email;
-            //   const query = { email: email };
-            //   const tasks = await taskCollection.find(query).toArray();
-            //   const cursor = taskCollection.find({});
-            //   const tasks = await cursor.toArray()
-            //  res.send(tasks);
-            //  })
+    // Add a new task
+    app.post("/tasks", async (req, res) => {
+      const task = req.body;
+      const result = await db.collection("tasks").insertOne(task);
+      res.status(201).json({
+        message: "Task added successfully",
+        task: result.ops[0],
+      });
+    });
 
-            // load user specific data
-            // app.get('/tasks', async(req, res) =>{
-            //   let query = {};
-            //   if(req.query.email){
-            //     query = {
-            //       email: req.query.email
-            //     }
-            //   }
-            //   const cursor = taskCollection.find(query);
-            //   const tasks = await cursor.toArray();
-            //   res.send(tasks);
-            // })
+    // Get all tasks by email
+    app.get("/tasks", async (req, res) => {
+      const email = req.query.email;
+      const query = { email: email };
+      const tasks = await db.collection("tasks").find(query).toArray();
+      res.status(200).json(tasks);
+    });
 
-            app.get('/tasks',  async(req, res) => {
-              const email = req.query.email;
-              const query = {email: email};
-              const tasks = await taskCollection.find(query).toArray();
-              res.send(tasks);
-          })
-         
-            app.post('/tasks', async(req, res) =>{
-                const task = req.body;
-                console.log(task);
-                const result = await taskCollection.insertOne(task);
-                res.send(result);
-            })
+    // Update task status
+    app.patch("/tasks/:id", async (req, res) => {
+      const { id } = req.params;
+      const { status } = req.body;
+      const result = await db
+        .collection("tasks")
+        .updateOne({ _id: ObjectId(id) }, { $set: { status } });
+      if (result.modifiedCount > 0) {
+        const updatedTask = await db
+          .collection("tasks")
+          .findOne({ _id: ObjectId(id) });
+        res.status(200).json({
+          message: "Task updated successfully",
+          task: updatedTask,
+        });
+      } else {
+        res.status(404).json({ message: "Task not found" });
+      }
+    });
 
-            app.delete('/tasks/:id', async(req, res) =>{
-              const id = req.params.id;
-              const query = {_id: ObjectId(id)}
-              // console.log('trying to delete', id)
-              const result = await taskCollection.deleteOne(query);
-              console.log(result)
-              res.send(result);
-            })
-          }
-          finally{
-
-          }
-
-           
-           
+    // Delete a task
+    app.delete("/tasks/:id", async (req, res) => {
+      const { id } = req.params;
+      const result = await db
+        .collection("tasks")
+        .deleteOne({ _id: ObjectId(id) });
+      if (result.deletedCount > 0) {
+        res.status(200).json({ message: "Task deleted successfully" });
+      } else {
+        res.status(404).json({ message: "Task not found" });
+      }
+    });
+  } finally {
+    // Close the MongoDB client
+  }
 }
-run().catch(err => console.error(err));
 
+run().catch((err) => console.error(err));
 
-app.get('/', (req, res) =>{
-    res.send('my task server is running')
-})
-
-app.listen(port, () =>{
-    console.log(`my task server is running on ${port}`)
-})
+app.listen(port, () => {
+  console.log(`Server running on port ${port}`);
+});
